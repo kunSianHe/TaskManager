@@ -42,6 +42,10 @@ else
     app.UseSwaggerUI();
 }
 
+// 讓 index.html 被提供
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

@@ -102,19 +102,28 @@ namespace TaskManager.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(task).State = EntityState.Modified;
+            var existingTask = await _context.Tasks.FindAsync(id);
+            if (existingTask == null)
+            {
+                return NotFound();
+            }
+
+            // 允許更新 IsCompleted 屬性
+            existingTask.Title = task.Title;
+            existingTask.Description = task.Description;
+            existingTask.IsCompleted = task.IsCompleted;
+
+            _context.Entry(existingTask).State = EntityState.Modified;
 
             try
             {
                 await _context.SaveChangesAsync();
-
-                // 刪除 Redis 快取 (單個任務 + 全部任務)
-                await _redisDb.KeyDeleteAsync($"task:{id}");
-                await _redisDb.KeyDeleteAsync("tasks");
+                await _redisDb.KeyDeleteAsync($"task:{id}"); // 刪除 Redis 快取
+                await _redisDb.KeyDeleteAsync("tasks"); // 讓列表快取失效
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!TaskExists(id))
+                if (!_context.Tasks.Any(e => e.Id == id))
                 {
                     return NotFound();
                 }
