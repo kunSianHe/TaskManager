@@ -22,6 +22,11 @@ namespace TaskManager.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// 取得所有任務
+        /// </summary>
+        /// <returns>任務列表</returns>
+        /// <response code="200">成功回傳任務列表</response>
         // GET: api/Tasks
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Task>>> GetTasks()
@@ -29,6 +34,13 @@ namespace TaskManager.Controllers
             return await _context.Tasks.ToListAsync();
         }
 
+        /// <summary>
+        /// 取得指定 ID 的任務
+        /// </summary>
+        /// <param name="id">任務 ID</param>
+        /// <returns>指定的任務</returns>
+        /// <response code="200">成功回傳任務</response>
+        /// <response code="404">找不到該任務</response>
         // GET: api/Tasks/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Task>> GetTask(int id)
@@ -43,6 +55,15 @@ namespace TaskManager.Controllers
             return task;
         }
 
+        /// <summary>
+        /// 更新指定 ID 的任務
+        /// </summary>
+        /// <param name="id">任務 ID</param>
+        /// <param name="task">更新後的任務內容</param>
+        /// <returns>無內容</returns>
+        /// <response code="204">成功更新</response>
+        /// <response code="400">請求格式錯誤</response>
+        /// <response code="404">找不到該任務</response>
         // PUT: api/Tasks/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
@@ -74,6 +95,13 @@ namespace TaskManager.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// 建立新的任務
+        /// </summary>
+        /// <param name="task">要建立的任務物件</param>
+        /// <returns>回傳新建的任務</returns>
+        /// <response code="201">成功建立任務</response>
+        /// <response code="400">請求格式錯誤</response>
         // POST: api/Tasks
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
@@ -85,6 +113,13 @@ namespace TaskManager.Controllers
             return CreatedAtAction("GetTask", new { id = task.Id }, task);
         }
 
+        /// <summary>
+        /// 刪除指定 ID 的任務
+        /// </summary>
+        /// <param name="id">任務 ID</param>
+        /// <returns>無內容</returns>
+        /// <response code="204">成功刪除</response>
+        /// <response code="404">找不到該任務</response>
         // DELETE: api/Tasks/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTask(int id)
