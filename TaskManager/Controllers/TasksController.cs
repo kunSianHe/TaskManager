@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using TaskManager.Data;
 using TaskManager.Models;
 using Task = TaskManager.Models.Task;
+using StackExchange.Redis;
+using System.Text.Json;
 
 namespace TaskManager.Controllers
 {
@@ -16,10 +18,12 @@ namespace TaskManager.Controllers
     public class TasksController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDatabase _redisDb;
 
-        public TasksController(ApplicationDbContext context)
+        public TasksController(ApplicationDbContext context, IConnectionMultiplexer redis)
         {
             _context = context;
+            _redisDb = redis.GetDatabase();
         }
 
         /// <summary>
@@ -31,7 +35,20 @@ namespace TaskManager.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Task>>> GetTasks()
         {
-            return await _context.Tasks.ToListAsync();
+            string cacheKey = "tasks";
+            string cachedTasks = await _redisDb.StringGetAsync(cacheKey);
+
+            if (!string.IsNullOrEmpty(cachedTasks))
+            {
+                var tasks = JsonSerializer.Deserialize<List<Task>>(cachedTasks);
+                return Ok(tasks);
+            }
+
+            var taskList = await _context.Tasks.ToListAsync();
+            await _redisDb.StringSetAsync(cacheKey, JsonSerializer.Serialize(taskList), TimeSpan.FromMinutes(5));
+
+            return Ok(taskList);
+            //return await _context.Tasks.ToListAsync();
         }
 
         /// <summary>
@@ -45,14 +62,25 @@ namespace TaskManager.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Task>> GetTask(int id)
         {
-            var task = await _context.Tasks.FindAsync(id);
+            string cacheKey = $"task:{id}";
+            string cachedTask = await _redisDb.StringGetAsync(cacheKey);
 
-            if (task == null)
+            if (!string.IsNullOrEmpty(cachedTask))
+            {
+                var task = JsonSerializer.Deserialize<Task>(cachedTask);
+                return Ok(task);
+            }
+
+            var taskFromDb = await _context.Tasks.FindAsync(id);
+
+            if (taskFromDb == null)
             {
                 return NotFound();
             }
 
-            return task;
+            await _redisDb.StringSetAsync(cacheKey, JsonSerializer.Serialize(taskFromDb), TimeSpan.FromMinutes(5));
+
+            return Ok(taskFromDb);
         }
 
         /// <summary>
@@ -79,6 +107,10 @@ namespace TaskManager.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                // 刪除 Redis 快取 (單個任務 + 全部任務)
+                await _redisDb.KeyDeleteAsync($"task:{id}");
+                await _redisDb.KeyDeleteAsync("tasks");
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -110,6 +142,8 @@ namespace TaskManager.Controllers
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
 
+            await _redisDb.KeyDeleteAsync("tasks");
+
             return CreatedAtAction("GetTask", new { id = task.Id }, task);
         }
 
@@ -132,6 +166,10 @@ namespace TaskManager.Controllers
 
             _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
+
+            // 刪除 Redis 快取 (單個任務 + 全部任務)
+            await _redisDb.KeyDeleteAsync($"task:{id}");
+            await _redisDb.KeyDeleteAsync("tasks");
 
             return NoContent();
         }
