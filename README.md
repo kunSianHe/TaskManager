@@ -111,4 +111,4 @@ dotnet ef database update
 
 ## 📜 License
 
-MIT License © 2025 YourName
+MIT License © 2025 Chris
